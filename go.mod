@@ -2,7 +2,10 @@ module TP-Estructura
 
 go 1.18
 
-require github.com/PuerkitoBio/goquery v1.8.0
+require (
+	github.com/PuerkitoBio/goquery v1.8.0
+	github.com/go-echarts/go-echarts/v2 v2.2.4
+)
 
 require (
 	github.com/andybalholm/cascadia v1.3.1 // indirect
