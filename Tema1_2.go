@@ -3,15 +3,17 @@ package main
 import (
 	"encoding/csv"
 	"fmt"
-	goquery "github.com/PuerkitoBio/goquery"
+	"github.com/PuerkitoBio/goquery"
 	"github.com/go-echarts/go-echarts/v2/charts"
 	"github.com/go-echarts/go-echarts/v2/opts"
 	"github.com/go-echarts/go-echarts/v2/types"
+	"github.com/gocolly/colly"
 	"math"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -51,11 +53,6 @@ func grafico(datos [20]LRA) {
 		items = append(items, opts.BarData{Value: datos[i].aparicion})
 		lenguajes = append(lenguajes, datos[i].lenguaje)
 	}
-	for j := range lenguajes {
-		println(lenguajes[j])
-	}
-	//repeticiones := []opts.BarData{{Value: 1}, {Value: 38}, {Value: 29}, {Value: 22}, {Value: 13}, {Value: 11}}
-	//lenguajes := []string{"USA", "China", "UK", "Russia", "South Korea", "Germany"}
 	bar := charts.NewBar()
 	bar.SetGlobalOptions(
 		charts.WithInitializationOpts(opts.Initialization{Theme: types.ThemeWesteros}),
@@ -76,19 +73,20 @@ func grafico(datos [20]LRA) {
 	bar.Render(f)
 }
 
-func main() {
+func Tema1() {
 	file, errors := os.Create("Resultados.csv")
 	check(errors)
 	writer := csv.NewWriter(file)
 	tiobe_github := [20]string{"python", "c", "java", "cpp", "csharp", "visual-basic", "javascript", "assembly", "sql", "php", "r", "delphi", "go", "swift", "ruby", "visual-basic-6", "objective-c", "perl", "lua", "matlab"}
 	tiobe_lenguajes := [20]string{"python", "C", "Java", "C++", "C#", "Visual Basic", "JavaScript", "Assembly language", "SQL", "PHP", "R", "Delphi/Object Pascal", "Go", "Swift", "Ruby", "Classic Visual Basic", "Objective-C", "Perl", "Lua", "MATLAB"}
-
 	datos := [20]LRA{}
 	mayor := 0
 	menor := math.MaxInt
+	var cadena string
 	for j := range tiobe_github {
 		direccion := "https://github.com/topics/"
 		url := direccion + tiobe_github[j]
+		println("Visiting " + url)
 		response, errors := http.Get(url)
 		defer response.Body.Close()
 		check(errors)
@@ -97,8 +95,6 @@ func main() {
 		}
 		doc, errors := goquery.NewDocumentFromReader(response.Body)
 		check(errors)
-
-		var cadena string
 		doc.Find("div.application-main ").Each(func(index int, item *goquery.Selection) {
 			h2 := item.Find("h2")
 			texto := strings.TrimSpace(h2.Text())
@@ -112,7 +108,6 @@ func main() {
 		})
 		posts := []string{tiobe_lenguajes[j], cadena}
 		writer.Write(posts)
-
 		apa, errors := strconv.Atoi(cadena)
 		check(errors)
 		if apa > mayor {
@@ -143,7 +138,76 @@ func main() {
 		}
 	}
 	for i := range datos {
-		fmt.Printf("%s\t\t%.2f\t\t%d\n", datos[i].lenguaje, datos[i].rating, datos[i].aparicion)
+		fmt.Printf("%s\t\t\t%.2f\t\t\t%d\n", datos[i].lenguaje, datos[i].rating, datos[i].aparicion)
 	}
 	grafico(datos)
+}
+
+type Topic struct {
+	horaActualizacion string
+	listaTopic        []string
+}
+
+func timeSub(t1, t2 time.Time) int {
+	t1 = t1.UTC().Truncate(24 * time.Hour)
+	t2 = t2.UTC().Truncate(24 * time.Hour)
+	return int(t1.Sub(t2).Hours() / 24)
+}
+
+//func timeSub(t1, t2 time.Time) int {
+//	t1 = time.Date(t1.Year(), t1.Month(), t1.Day(), 0, 0, 0, 0, time.Local)
+//	t2 = time.Date(t2.Year(), t2.Month(), t2.Day(), 0, 0, 0, 0, time.Local)
+//
+//	return int(t1.Sub(t2).Hours() / 24)
+//}
+func Tema2() {
+	topicSeleccionado := "https://github.com/topics/go"
+	c := colly.NewCollector(
+	//colly.AllowedDomains("https://github.com"),
+	)
+	c.OnHTML("article.border.rounded.color-shadow-small.color-bg-subtle.my-4", func(e *colly.HTMLElement) {
+		r := Topic{horaActualizacion: strings.TrimSpace(e.ChildAttr("relative-time.no-wrap", "datetime"))}
+		Topic := e.ChildText("a.topic-tag.topic-tag-link.f6.mb-2")
+		Topic = strings.ReplaceAll(Topic, "\n\n", " ")
+		//Topic = strings.ReplaceAll(Topic, " ", "")
+		//listaTopic := strings.Split(Topic, " ")
+		listaTopic := strings.Fields(Topic)
+		extraido := r.horaActualizacion[:10]
+		println(extraido)
+
+		fecha, error := time.Parse("2006-01-02", extraido)
+		check(error)
+		println(timeSub(time.Now(), fecha))
+		//println(r.horaActualizacion, listaTopic)
+
+		if listaTopic != nil {
+			for i, s := range listaTopic {
+				listaTopic[i] = s
+				fmt.Printf(" %d-%s ", i, s)
+			}
+			println("")
+		}
+		//	r.listaTopic = listaTopic
+		//	listaRetorno = append(listaRetorno, r)
+		//
+		//}
+		//link := e.Attr("href")
+		//fmt.Printf("\nfound: %s", e.Attr(""))
+		// Visit link found on page
+		// Only those links are visited which are in AllowedDomains
+		//c.Visit(e.Request.AbsoluteURL())
+	})
+
+	// Before making a request print "Visiting ..."
+	c.OnRequest(func(r *colly.Request) {
+		fmt.Println("Visiting", r.URL.String())
+	})
+
+	// Start scraping on https://hackerspaces.org
+	c.Visit(topicSeleccionado)
+}
+func main() {
+	//Tema1()
+	Tema2()
+
 }
