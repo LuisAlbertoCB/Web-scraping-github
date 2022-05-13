@@ -8,9 +8,11 @@ import (
 	"github.com/go-echarts/go-echarts/v2/opts"
 	"github.com/go-echarts/go-echarts/v2/types"
 	"github.com/gocolly/colly"
+	"log"
 	"math"
 	"net/http"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -55,13 +57,13 @@ func ordenar(datos []LRA) []LRA {
 	}
 	return datos
 }
-func grafico(datos [20]LRA) {
+func grafico(datos []LRA, nombreGrafico string) {
 	lenguajes := make([]string, 0)
 	items := make([]opts.BarData, 0)
 	lenguajes = append(lenguajes, "")
 	items = append(items, opts.BarData{Value: 0})
 
-	for i := 0; i < 10; i++ {
+	for i := 0; i < len(datos); i++ {
 		items = append(items, opts.BarData{Value: datos[i].aparicion})
 		lenguajes = append(lenguajes, datos[i].lenguaje)
 	}
@@ -81,8 +83,13 @@ func grafico(datos [20]LRA) {
 
 	bar.SetXAxis(lenguajes)
 	bar.AddSeries("Apariciones", items)
-	f, _ := os.Create("bar.html")
+	f, _ := os.Create(nombreGrafico)
 	bar.Render(f)
+	if salida, err := exec.Command("powershell", "C:\\Users\\Luis\\go\\src\\TP-Estructura.\\"+nombreGrafico).CombinedOutput(); err != nil {
+		log.Fatal(err)
+	} else {
+		fmt.Printf("%s\n", salida)
+	}
 }
 func timeSub(t1, t2 time.Time) int {
 	t1 = t1.UTC().Truncate(24 * time.Hour)
@@ -96,7 +103,7 @@ func Tema1() {
 	writer := csv.NewWriter(file)
 	tiobe_github := [20]string{"python", "c", "java", "cpp", "csharp", "visual-basic", "javascript", "assembly", "sql", "php", "r", "delphi", "go", "swift", "ruby", "visual-basic-6", "objective-c", "perl", "lua", "matlab"}
 	tiobe_lenguajes := [20]string{"python", "C", "Java", "C++", "C#", "Visual Basic", "JavaScript", "Assembly language", "SQL", "PHP", "R", "Delphi/Object Pascal", "Go", "Swift", "Ruby", "Classic Visual Basic", "Objective-C", "Perl", "Lua", "MATLAB"}
-	datos := [20]LRA{}
+	datos := []LRA{}
 	mayor := 0
 	menor := math.MaxInt
 	var cadena string
@@ -136,15 +143,11 @@ func Tema1() {
 		if apa < menor {
 			menor = apa
 		}
-		datos[j] = LRA{
-			lenguaje:  tiobe_lenguajes[j],
-			rating:    0,
-			aparicion: apa,
-		}
+		datos = append(datos, LRA{lenguaje: tiobe_lenguajes[j], rating: 0, aparicion: apa})
 		writer.Flush()
 		//fmt.Print(tiobe_lenguajes[j], "\t\t", cadena, "\n")
 	}
-	for i := range datos {
+	for i := 0; i < len(datos); i++ {
 		datos[i].rating = calcularRating(float32(datos[i].aparicion), float32(mayor), float32(menor))
 	}
 	var auxiliar LRA
@@ -161,7 +164,7 @@ func Tema1() {
 	for i := range datos {
 		fmt.Printf("%20s\t\t%.2f\t\t%d\n", datos[i].lenguaje, datos[i].rating, datos[i].aparicion)
 	}
-	grafico(datos)
+	grafico(datos[:10], "Grafico1.html")
 }
 
 func Tema2() {
@@ -221,10 +224,12 @@ func Tema2() {
 	for i := 0; i < 20; i++ {
 		fmt.Printf("\n%20s\t%d", TopicsOrdenados[i].lenguaje, TopicsOrdenados[i].aparicion)
 	}
+	grafico(TopicsOrdenados[:20], "Grafico2.html")
+
 }
+
 func main() {
 
-	//Tema1()
+	Tema1()
 	Tema2()
-
 }
