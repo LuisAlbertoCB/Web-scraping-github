@@ -17,32 +17,44 @@ import (
 	"unicode"
 )
 
-func check(err error) {
-	if err != nil {
-		fmt.Print(err)
-	}
-}
-
+//Estructuras y variables globales
 type LRA struct {
 	lenguaje  string
 	rating    float32
 	aparicion int
 }
 
+//rutinas
+func check(err error) {
+	if err != nil {
+		fmt.Print("\nHay un error!!: ", err)
+	}
+}
 func writeFile(data, filename string) {
 	file, errors := os.Create(filename)
 	defer file.Close()
 	check(errors)
 	file.WriteString(data)
 }
-
 func calcularRating(x, Max, Min float32) float32 {
 	var R float32
 	R = (((x - Min) / (Max - Min)) * 100.0)
 	R = float32(math.Round(float64(R*100)) / 100)
 	return R
 }
-
+func ordenar(datos []LRA) []LRA {
+	var auxiliar LRA
+	for n := 1; n < len(datos)-1; n++ {
+		for j := 0; j < len(datos)-n; j++ {
+			if datos[j].aparicion < datos[j+1].aparicion {
+				auxiliar = datos[j]
+				datos[j] = datos[j+1]
+				datos[j+1] = auxiliar
+			}
+		}
+	}
+	return datos
+}
 func grafico(datos [20]LRA) {
 	lenguajes := make([]string, 0)
 	items := make([]opts.BarData, 0)
@@ -72,8 +84,13 @@ func grafico(datos [20]LRA) {
 	f, _ := os.Create("bar.html")
 	bar.Render(f)
 }
-
+func timeSub(t1, t2 time.Time) int {
+	t1 = t1.UTC().Truncate(24 * time.Hour)
+	t2 = t2.UTC().Truncate(24 * time.Hour)
+	return int(t1.Sub(t2).Hours() / 24)
+}
 func Tema1() {
+	println("Iniciando Tema 1....")
 	file, errors := os.Create("Resultados.csv")
 	check(errors)
 	writer := csv.NewWriter(file)
@@ -84,6 +101,7 @@ func Tema1() {
 	menor := math.MaxInt
 	var cadena string
 	for j := range tiobe_github {
+		time.Sleep(3 * time.Second)
 		direccion := "https://github.com/topics/"
 		url := direccion + tiobe_github[j]
 		println("Visiting " + url)
@@ -91,7 +109,7 @@ func Tema1() {
 		defer response.Body.Close()
 		check(errors)
 		if response.StatusCode > 400 {
-			fmt.Print("Status code:", response.StatusCode)
+			fmt.Print("\nStatus code:", response.StatusCode)
 		}
 		doc, errors := goquery.NewDocumentFromReader(response.Body)
 		check(errors)
@@ -105,10 +123,12 @@ func Tema1() {
 					cadena = cadena + a
 				}
 			}
+
 		})
 		posts := []string{tiobe_lenguajes[j], cadena}
 		writer.Write(posts)
 		apa, errors := strconv.Atoi(cadena)
+		cadena = ""
 		check(errors)
 		if apa > mayor {
 			mayor = apa
@@ -137,76 +157,73 @@ func Tema1() {
 			}
 		}
 	}
+	fmt.Println("\n\tLenguajes\t\tRating\t\tNºAparicion")
 	for i := range datos {
-		fmt.Printf("%s\t\t\t%.2f\t\t\t%d\n", datos[i].lenguaje, datos[i].rating, datos[i].aparicion)
+		fmt.Printf("%20s\t\t%.2f\t\t%d\n", datos[i].lenguaje, datos[i].rating, datos[i].aparicion)
 	}
 	grafico(datos)
 }
 
-type Topic struct {
-	horaActualizacion string
-	listaTopic        []string
-}
-
-func timeSub(t1, t2 time.Time) int {
-	t1 = t1.UTC().Truncate(24 * time.Hour)
-	t2 = t2.UTC().Truncate(24 * time.Hour)
-	return int(t1.Sub(t2).Hours() / 24)
-}
-
-//func timeSub(t1, t2 time.Time) int {
-//	t1 = time.Date(t1.Year(), t1.Month(), t1.Day(), 0, 0, 0, 0, time.Local)
-//	t2 = time.Date(t2.Year(), t2.Month(), t2.Day(), 0, 0, 0, 0, time.Local)
-//
-//	return int(t1.Sub(t2).Hours() / 24)
-//}
 func Tema2() {
-	topicSeleccionado := "https://github.com/topics/go"
+	println("Iniciando Tema 2....")
+	file, errors := os.Create("TopicDeInteres.csv")
+	check(errors)
+	writer := csv.NewWriter(file)
+	topicSeleccionado := "https://github.com/topics/go?page="
+	var i = 0
+	var TopicApariciones = make(map[string]int)
 	c := colly.NewCollector(
 	//colly.AllowedDomains("https://github.com"),
 	)
 	c.OnHTML("article.border.rounded.color-shadow-small.color-bg-subtle.my-4", func(e *colly.HTMLElement) {
-		r := Topic{horaActualizacion: strings.TrimSpace(e.ChildAttr("relative-time.no-wrap", "datetime"))}
-		Topic := e.ChildText("a.topic-tag.topic-tag-link.f6.mb-2")
-		Topic = strings.ReplaceAll(Topic, "\n\n", " ")
-		//Topic = strings.ReplaceAll(Topic, " ", "")
-		//listaTopic := strings.Split(Topic, " ")
+		horaActualizacion := strings.TrimSpace(e.ChildAttr("relative-time.no-wrap", "datetime"))
+		Topic := strings.TrimSpace(e.ChildText("a.topic-tag.topic-tag-link.f6.mb-2"))
+		//Topic = strings.ReplaceAll(Topic, "\n\n", " ")
 		listaTopic := strings.Fields(Topic)
-		extraido := r.horaActualizacion[:10]
-		println(extraido)
-
-		fecha, error := time.Parse("2006-01-02", extraido)
+		FechaExtraido := horaActualizacion[:10] //fecha extraida
+		//println(FechaExtraido)
+		fecha, error := time.Parse("2006-01-02", FechaExtraido) //parseo de fecha time.time
 		check(error)
-		println(timeSub(time.Now(), fecha))
-		//println(r.horaActualizacion, listaTopic)
-
+		diaDiferencia := timeSub(time.Now(), fecha) //se realiza la resta de la fecha
 		if listaTopic != nil {
-			for i, s := range listaTopic {
-				listaTopic[i] = s
-				fmt.Printf(" %d-%s ", i, s)
+			if diaDiferencia <= 30 {
+				for _, s := range listaTopic {
+					ap := TopicApariciones[strings.TrimSpace(s)]
+					TopicApariciones[strings.TrimSpace(s)] = (ap + 1)
+				}
 			}
-			println("")
 		}
-		//	r.listaTopic = listaTopic
-		//	listaRetorno = append(listaRetorno, r)
-		//
-		//}
-		//link := e.Attr("href")
-		//fmt.Printf("\nfound: %s", e.Attr(""))
-		// Visit link found on page
-		// Only those links are visited which are in AllowedDomains
-		//c.Visit(e.Request.AbsoluteURL())
-	})
+		i++
 
-	// Before making a request print "Visiting ..."
+		if i < 35 {
+			time.Sleep(3 * time.Second)
+			c.Visit(topicSeleccionado + strconv.Itoa(i))
+		}
+	})
 	c.OnRequest(func(r *colly.Request) {
-		fmt.Println("Visiting", r.URL.String())
+		fmt.Println("Recopilando datos de: ", r.URL.String())
 	})
+	//c.OnResponse(func(r *colly.Response) {
+	//	log.Println("response received", r.StatusCode)
+	//	re = r.StatusCode
+	//})
+	c.Visit(topicSeleccionado + strconv.Itoa(0))
 
-	// Start scraping on https://hackerspaces.org
-	c.Visit(topicSeleccionado)
+	TopicsOrdenados := []LRA{}
+	for c, v := range TopicApariciones {
+		TopicsOrdenados = append(TopicsOrdenados, LRA{lenguaje: c, rating: 0, aparicion: v})
+		posts := []string{c, strconv.Itoa(v)}
+		writer.Write(posts)
+	}
+	writer.Flush()
+	TopicsOrdenados = ordenar(TopicsOrdenados)
+	println("\tTopics\t\tNºApariciones")
+	for i := 0; i < 20; i++ {
+		fmt.Printf("\n%20s\t%d", TopicsOrdenados[i].lenguaje, TopicsOrdenados[i].aparicion)
+	}
 }
 func main() {
+
 	//Tema1()
 	Tema2()
 
